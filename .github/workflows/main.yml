@@ -1,0 +1,45 @@
+name: Heal
+ 
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+
+    steps:
+       - name: Checkouts
+         uses: actions/checkout@master
+         
+       - name: Clean
+         uses: rokibhasansagar/slimhub_actions@main
+         
+       - name: Initializing environment
+         continue-on-error: true
+         timeout-minutes: 10
+         run: |
+              sudo -E apt-get -qq update
+              git config --global user.name "${{ secrets.GHUSER }}"
+              git config --global user.email "${{ secrets.GHMAIL }}"
+              echo "https://${{ secrets.GHUSER }}:${{ secrets.TOKEN }}@github.com" > ~/.git-credentials
+                   
+       - name: Setup Java
+         run: |
+              sudo apt update
+              git clone ${{ secrets.REPO }} -b main source
+              cd source || exit 1
+              docker build . --rm --force-rm --compress --no-cache=true --pull --file Dockerfile -t heal
+
+       - name: Run Bot
+         timeout-minutes: 330
+         continue-on-error: true
+         run: |
+              docker run --privileged --rm -i heal
+
+       - name: Re-run workflow
+         continue-on-error: true
+         run: |
+              git clone https://${{ secrets.GH_TOKEN }}@github.com/${GITHUB_REPOSITORY} loop ; cd loop
+              git commit --allow-empty -m "[LOOP] Re-run"
+              git push -f
